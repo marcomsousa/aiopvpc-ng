@@ -1,5 +1,11 @@
 # Changelog
 
+## [v5.1.2](https://github.com/marcomsousa/aiopvpc-ng/tree/v5.1.2) - 🔐 Enable PEP 740 PyPI provenance attestations (2026-11-20)
+
+[Full Changelog](https://github.com/marcomsousa/aiopvpc-ng/compare/v5.1.1...v5.1.2)
+
+- 🔐 Publish releases with `pypa/gh-action-pypi-publish@release/v1` (`attestations: true`) to attach PEP 740 cryptographic provenance attestations on PyPI
+
 ## [v5.1.1](https://github.com/marcomsousa/aiopvpc-ng/tree/v5.1.1) - 🔗 Preserve default ESIOS indicator URL format for Home Assistant Core test mocks (2026-11-20)
 
 [Full Changelog](https://github.com/marcomsousa/aiopvpc-ng/compare/v5.1.0...v5.1.1)
