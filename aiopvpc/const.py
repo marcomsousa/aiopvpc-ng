@@ -20,6 +20,7 @@ DEFAULT_POWER_KW = 3.3
 
 # Prices are given in 0 to 24h sets, adjusted to the main timezone in Spain
 REFERENCE_TZ = zoneinfo.ZoneInfo("Europe/Madrid")
+CANARY_TZ = zoneinfo.ZoneInfo("Atlantic/Canary")
 UTC_TZ = zoneinfo.ZoneInfo("UTC")
 
 DEFAULT_TIMEOUT = 10
@@ -36,8 +37,7 @@ GEOZONE_ID2NAME: dict[int, str] = {
     8745: "Melilla",
 }
 URL_PUBLIC_PVPC_RESOURCE = (
-    "https://api.esios.ree.es/archives/70/download_json"
-    "?locale=es&date={day:%Y-%m-%d}"
+    "https://api.esios.ree.es/archives/70/download_json?locale=es&date={day:%Y-%m-%d}"
 )
 URL_ESIOS_TOKEN_RESOURCE = (
     "https://api.esios.ree.es/indicators/{ind}"

@@ -1,6 +1,6 @@
 """Tests for aiopvpc."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import cast
 
 import pytest
@@ -8,6 +8,7 @@ import pytest
 from aiopvpc.const import (
     ALL_SENSORS,
     DataSource,
+    ESIOS_PVPC,
     KEY_ADJUSTMENT,
     KEY_INJECTION,
     KEY_MAG,
@@ -16,6 +17,7 @@ from aiopvpc.const import (
     REFERENCE_TZ,
     SENSOR_KEY_TO_DATAID,
 )
+from aiopvpc.parser import extract_prices_from_esios_token
 from aiopvpc.pvpc_data import PVPCData
 from tests.conftest import MockAsyncSession, TZ_TEST
 
@@ -60,7 +62,7 @@ async def test_price_extract(
         session=mock_session,
         tariff="2.0TD",
         local_timezone=timezone,
-        data_source=cast(DataSource, source),
+        data_source=cast("DataSource", source),
         api_token="test-token" if source == "esios" else None,
     )
 
@@ -76,7 +78,7 @@ async def test_price_extract(
     assert len(api_data.sensors[KEY_PVPC]) == n_prices_8h
     assert has_prices == available_8h
     if has_prices:
-        last_dt, last_p = list(api_data.sensors[KEY_PVPC].items())[-1]
+        last_dt, _ = list(api_data.sensors[KEY_PVPC].items())[-1]
         assert last_dt.astimezone(timezone).hour == 23
 
 
@@ -127,9 +129,9 @@ async def test_price_sensor_attributes():
         assert sensor_attrs["price_23h"] == last_p
         assert sensor_attrs["min_price"] == min(api_data.sensors[key].values())
         assert sensor_attrs["max_price"] == max(api_data.sensors[key].values())
-        key_min_at = f'price_{sensor_attrs["min_price_at"]:02d}h'
+        key_min_at = f"price_{sensor_attrs['min_price_at']:02d}h"
         assert sensor_attrs[key_min_at] == min(api_data.sensors[key].values())
-        key_max_at = f'price_{sensor_attrs["max_price_at"]:02d}h'
+        key_max_at = f"price_{sensor_attrs['max_price_at']:02d}h"
         assert sensor_attrs[key_max_at] == max(api_data.sensors[key].values())
         assert (
             sensor_attrs["hours_to_better_price"]
@@ -139,7 +141,7 @@ async def test_price_sensor_attributes():
             sensor_attrs["num_better_prices_ahead"]
             == ref_data[key]["num_better_prices_ahead"]
         )
-        key_next = f'price_{12 + sensor_attrs["hours_to_better_price"]}h'
+        key_next = f"price_{12 + sensor_attrs['hours_to_better_price']}h"
         if key == KEY_INJECTION:
             assert sensor_attrs[key_next] > current_price
             num_better = sum(1 for p in prices_ahead if p > current_price)
@@ -147,3 +149,81 @@ async def test_price_sensor_attributes():
             assert sensor_attrs[key_next] < current_price
             num_better = sum(1 for p in prices_ahead if p < current_price)
         assert num_better == sensor_attrs["num_better_prices_ahead"]
+
+
+def _make_quarter_hourly_indicator_payload(target_day: date) -> dict:
+    """Build synthetic 96-slot (15-min) ESIOS indicator payload for a single day."""
+    start = datetime(
+        target_day.year, target_day.month, target_day.day, tzinfo=REFERENCE_TZ
+    )
+    values = [
+        {
+            "value": float(100 + i),
+            "datetime": (start + timedelta(minutes=15 * i)).isoformat(),
+            "geo_id": 8741,
+            "geo_name": "Península",
+        }
+        for i in range(96)
+    ]
+    return {
+        "indicator": {
+            "id": 1001,
+            "name": "PVPC 15min",
+            "magnitud": [{"name": "EUR"}],
+            "tiempo": [{"name": "Cuarto de hora"}],
+            "values": values,
+        }
+    }
+
+
+@pytest.mark.asyncio
+async def test_quarter_hourly_parsing_and_scheduling():
+    """Verify 15-minute slot parsing, attribute keys, and 20:00 next-day fetch."""
+    day1 = date(2026, 1, 15)
+    day2 = date(2026, 1, 16)
+    payload_day1 = _make_quarter_hourly_indicator_payload(day1)
+    parsed = extract_prices_from_esios_token(payload_day1, KEY_PVPC, "Península")
+    assert len(parsed.series[KEY_PVPC]) == 96
+
+    mock_session = MockAsyncSession()
+    mock_session.responses_token[ESIOS_PVPC][day1] = payload_day1
+    mock_session.responses_token[ESIOS_PVPC][day2] = (
+        _make_quarter_hourly_indicator_payload(day2)
+    )
+    pvpc_data = PVPCData(
+        session=mock_session,
+        tariff="2.0TD",
+        local_timezone=REFERENCE_TZ,
+        data_source="esios",
+        api_token="test-token",
+    )
+
+    morning = datetime(2026, 1, 15, 10, 0, tzinfo=REFERENCE_TZ)
+    api_data = await pvpc_data.async_update_all(None, morning)
+    assert mock_session.call_count == 1
+    assert len(api_data.sensors[KEY_PVPC]) == 96
+
+    # Check 15-minute slot snapping (:00, :15, :30, :45)
+    for minute, key_name, expected_idx in (
+        (5, "price_10h", 40),
+        (22, "price_10h15", 41),
+        (37, "price_10h30", 42),
+        (59, "price_10h45", 43),
+    ):
+        ts = datetime(2026, 1, 15, 10, minute, tzinfo=REFERENCE_TZ)
+        assert pvpc_data.process_state_and_attributes(api_data, KEY_PVPC, ts)
+        expected_price = round((100 + expected_idx) / 1000.0, 5)
+        assert pvpc_data.states[KEY_PVPC] == expected_price
+        assert pvpc_data.sensor_attributes[KEY_PVPC][key_name] == expected_price
+        assert len(api_data.sensors[KEY_PVPC]) == 96
+
+    # At 20:00 with 96 today slots, must still fetch tomorrow's prices
+    evening_20 = datetime(2026, 1, 15, 20, 0, tzinfo=REFERENCE_TZ)
+    api_data = await pvpc_data.async_update_all(api_data, evening_20)
+    assert mock_session.call_count == 2
+    assert len(api_data.sensors[KEY_PVPC]) == 192
+
+    # Subsequent evening call avoids redundant requests
+    evening_21 = datetime(2026, 1, 15, 21, 0, tzinfo=REFERENCE_TZ)
+    api_data = await pvpc_data.async_update_all(api_data, evening_21)
+    assert mock_session.call_count == 2

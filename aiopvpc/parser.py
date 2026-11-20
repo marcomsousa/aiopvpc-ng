@@ -5,12 +5,13 @@ Simple aio library to download Spanish electricity hourly prices.
 * Parser for the contents of the JSON files
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from itertools import groupby
 from operator import itemgetter
 from typing import Any
 
 from aiopvpc.const import (
+    CANARY_TZ,
     DataSource,
     EsiosResponse,
     GEOZONE_ID2NAME,
@@ -34,6 +35,25 @@ def _timezone_offset(tz: zoneinfo.ZoneInfo = REFERENCE_TZ) -> timedelta:
     return loc_ts - ref_ts
 
 
+def resolve_geo_zone(
+    tariff: str,
+    tz: zoneinfo.ZoneInfo,
+    geo_zone: str | None = None,
+) -> str:
+    """Resolve ESIOS geozone name from explicit override, tariff, and timezone."""
+    if geo_zone is not None:
+        if geo_zone not in GEOZONES:
+            raise ValueError(
+                f"Unknown geozone '{geo_zone}'. Expected one of {GEOZONES}"
+            )
+        return geo_zone
+    if tariff != TARIFFS[0]:
+        return "Ceuta"
+    if tz == CANARY_TZ:
+        return "Canarias"
+    return "Península"
+
+
 def extract_prices_from_esios_public(
     data: dict[str, Any], key: str, tz: zoneinfo.ZoneInfo = REFERENCE_TZ
 ) -> EsiosResponse:
@@ -54,7 +74,7 @@ def extract_prices_from_esios_public(
     return EsiosResponse(
         name="PVPC ESIOS",
         data_id="legacy",
-        last_update=datetime.utcnow().replace(microsecond=0, tzinfo=UTC_TZ),
+        last_update=datetime.now(UTC).replace(microsecond=0),
         unit="€/kWh",
         series={KEY_PVPC: pvpc_prices},
     )
@@ -68,25 +88,25 @@ def extract_prices_from_esios_token(
 ) -> EsiosResponse:
     """Parse the contents of an 'indicator' json file from ESIOS API."""
     offset_timezone = _timezone_offset(tz)
-    indicator_data = data.pop("indicator")
+    indicator_data = data["indicator"]
     unit = "•".join(mag["name"] for mag in indicator_data["magnitud"])
     unit_tiempo = "•".join(mag["name"] for mag in indicator_data["tiempo"])
     unit += f"/{unit_tiempo}"
-    ts_update = datetime.utcnow().replace(microsecond=0, tzinfo=UTC_TZ)
+    ts_update = datetime.now(UTC).replace(microsecond=0)
 
     def _parse_dt(ts: str) -> datetime:
         return datetime.fromisoformat(ts).astimezone(UTC_TZ) + offset_timezone
 
     def _value_unit_conversion(value: float) -> float:
         # from €/MWh to €/kWh
-        return round(float(value) / 1000.0, 5)
+        return round(float(value) / 1000.0, PRICE_PRECISION)
 
     value_gen = groupby(
         sorted(indicator_data["values"], key=itemgetter("geo_id")),
         itemgetter("geo_id"),
     )
     parsed_data = {
-        GEOZONE_ID2NAME[key]: {
+        GEOZONE_ID2NAME.get(key, str(key)): {
             _parse_dt(item["datetime"]): _value_unit_conversion(item["value"])
             for item in list(group)
         }
@@ -114,21 +134,15 @@ def extract_esios_data(
     sensor_key: str,
     tariff: str,
     tz: zoneinfo.ZoneInfo = REFERENCE_TZ,
+    geo_zone: str | None = None,
 ) -> EsiosResponse:
     """Parse the contents of a daily PVPC json file."""
     if url.startswith("https://api.esios.ree.es/archives"):
         return extract_prices_from_esios_public(data, TARIFF2ID[tariff], tz)
 
     if url.startswith("https://api.esios.ree.es/indicators"):
-        # TODO adapt better to geozones
-        if tariff == TARIFFS[0] and tz != REFERENCE_TZ:
-            geo_zone = GEOZONES[1]
-        elif tariff == TARIFFS[0]:
-            geo_zone = GEOZONES[0]
-        else:
-            geo_zone = GEOZONES[3]
-
-        return extract_prices_from_esios_token(data, sensor_key, geo_zone, tz)
+        resolved_geo = resolve_geo_zone(tariff, tz, geo_zone)
+        return extract_prices_from_esios_token(data, sensor_key, resolved_geo, tz)
     raise NotImplementedError(f"Data source not known: {url} >{data}")
 
 
