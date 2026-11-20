@@ -1,5 +1,33 @@
 # Changelog
 
+## [v5.0.0](https://github.com/marcomsousa/aiopvpc-ng/tree/v5.0.0) - 🚀 Next-Gen modernization & Python 3.11+ (2026-11-20)
+
+[Full Changelog](https://github.com/marcomsousa/aiopvpc-ng/compare/v4.3.1...v5.0.0)
+
+### Breaking Changes
+
+- 💥 Rename PyPI distribution package to `aiopvpc-ng` (keeping the `aiopvpc` import namespace as a drop-in successor to `azogue/aiopvpc`)
+- 💥 Require Python `>=3.11` (dropped EOL Python 3.9 and 3.10) and remove external `async-timeout` dependency in favor of stdlib `asyncio.timeout`
+- 💥 Align P3 national holidays strictly with **CNMC Circular 3/2020 (Art. 7.3)**: 24h P3 valley period applies on weekends and the 9 fixed-date non-substitutable national holidays (Jan 1, Jan 6, May 1, Aug 15, Oct 12, Nov 1, Dec 6, Dec 8, Dec 25), excluding movable Good Friday
+
+### Features
+
+- ✨ Replace hardcoded 2021–2025 holiday table in `aiopvpc/pvpc_tariff.py` with non-expiring fixed-date P3 holiday detection (`is_national_p3_holiday`), eliminating `KeyError: 2026` onward
+- ✨ Add optional `geo_zone` parameter on `PVPCData` (backed by `resolve_geo_zone` and exported `GEOZONES`) with fail-fast validation
+- ✨ Prepare for quarter-hourly (15-minute) ESIOS pricing: date-based next-day fetch check at 20:00 `Europe/Madrid`, 15-minute slot snapping in `process_state_and_attributes`, and `price_HHhMM` attribute keys
+
+### Fixes & Improvements
+
+- ♻️ Replace deprecated `datetime.utcnow()` calls with timezone-aware `datetime.now(UTC)`
+- 🧹 Remove obsolete 2016–2019 browser `User-Agent` rotation from `PVPCData`
+- 🛡️ Avoid mutating caller dicts in `extract_prices_from_esios_token` and handle unknown ESIOS `geo_id`s safely without `KeyError`
+
+### Tooling & CI
+
+- 📦 Migrate packaging and dependency management from Poetry to `uv` + `hatchling` (PEP 621 / PEP 639 / PEP 735)
+- ⬆️ Update all runtime/dev dependencies and `.pre-commit-config.yaml` hooks
+- 👷 Run CI matrix across Python 3.11–3.14 with `ruff` lint/format checks, `mypy`, `pytest` (100% branch coverage), and `uv build`, plus release-triggered PyPI OIDC Trusted Publishing
+
 ## [v4.3.1](https://github.com/azogue/aiopvpc/tree/v4.3.1) - 🐛 Fix unsorted prices in composed sensor 'INDEXED' (2024-03-25)
 
 [Full Changelog](https://github.com/azogue/aiopvpc/compare/v4.3.0...v4.3.1)

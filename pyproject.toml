@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aiopvpc-ng"
-version = "4.3.1"
+version = "5.0.0"
 description = "Next-generation async library to retrieve Spanish Electricity hourly prices (PVPC)"
 readme = "README.md"
 license = "MIT"
@@ -27,7 +27,6 @@ classifiers = [
 ]
 dependencies = [
     "aiohttp>=3.10.0",
-    "async-timeout>=4.0.3",
 ]
 
 [project.urls]
@@ -53,7 +52,6 @@ packages = ["aiopvpc"]
 
 [tool.ruff]
 target-version = "py311"
-fix = true
 line-length = 88
 
 [tool.ruff.lint]

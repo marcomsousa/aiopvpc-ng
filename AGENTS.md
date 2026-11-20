@@ -13,22 +13,22 @@
 
 ## 2. Next-Gen (`ng`) Goals & Modernization Priorities
 
-When planning features, refactors, or fixes in this repository, prioritize these core objectives:
+When planning features, refactors, or fixes in this repository, uphold and advance these core objectives (initial v5.0.0 baseline completed):
 
-1. **Eliminate Time-Bomb & Maintenance Debt**
-   - Replace the hardcoded `_NATIONAL_EXTRA_HOLIDAYS_FOR_P3_PERIOD` dictionary in `aiopvpc/pvpc_tariff.py` (which only covers 2021–2025 and raises `KeyError` from 2026 onward) with deterministic/algorithmic calculation of Spanish non-substitutable national holidays (including Good Friday) so tariff period detection (`P1`/`P2`/`P3`) never expires.
-   - Clean up legacy `TODO` items (e.g., obsolete 2016–2019 browser `User-Agent` rotation in `pvpc_data.py` and geozone handling in `parser.py`).
+1. **Zero Time-Bomb & Maintenance Debt**
+   - `aiopvpc/pvpc_tariff.py` computes Spanish 24h P3 national holidays deterministically using the 9 fixed-date non-substitutable national holidays under CNMC Circular 3/2020 Art. 7.3 (`is_national_p3_holiday`), excluding movable Good Friday.
+   - Legacy browser `User-Agent` rotation (`pvpc_data.py`), `dict.pop()` mutation, and geozone `TODO`s (`parser.py` now provides `resolve_geo_zone` and optional `geo_zone`) have been resolved.
 
-2. **Modernize Python Runtime, Tooling & CI**
-   - Remove deprecated APIs (`datetime.utcnow()` → timezone-aware `datetime.now(UTC)`; external `async_timeout` → stdlib `asyncio.timeout` where minimum Python version permits).
-   - Modernize Python version support, packaging/lockfile metadata (`pyproject.toml`), pre-commit hooks, and GitHub Actions workflows (updating outdated actions and rebranding package metadata/URLs to `aiopvpc-ng` when ready for release).
+2. **Modern Python Runtime, Tooling & CI**
+   - Uses Python `>=3.11` stdlib APIs (`datetime.now(UTC)`, `asyncio.timeout`, built-in `TimeoutError`) without external `async_timeout`.
+   - Managed with `uv`, `hatchling` (PEP 621 / PEP 639 / PEP 735), modern `.pre-commit-config.yaml`, and GitHub Actions running `ruff`, `mypy`, `pytest`, and `uv build` across Python 3.11–3.14.
 
 3. **Keep Up With ESIOS API & Spanish Electricity Market Changes**
    - Maintain compatibility with `api.esios.ree.es` public archives and token-authenticated `/indicators/{id}` endpoints.
-   - Prepare and adapt cleanly for regulatory/market evolutions (e.g., indicator changes, geozone refinements, or quarter-hourly / 15-minute pricing structures).
+   - Preserve and evolve quarter-hourly / 15-minute pricing readiness (`_update_prices_series` date checks, 15-minute slot snapping, `price_HHhMM` attributes) alongside regulatory/market changes.
 
 4. **Preserve Home Assistant Integration Ergonomics**
-   - Keep the public interface (`PVPCData`, `EsiosApiData`, `BadApiTokenAuthError`, `TARIFFS`, `DEFAULT_POWER_KW`, `get_enabled_sensor_keys`) clean, typed, and predictable.
+   - Keep the public interface (`PVPCData`, `EsiosApiData`, `BadApiTokenAuthError`, `TARIFFS`, `GEOZONES`, `DEFAULT_POWER_KW`, `get_enabled_sensor_keys`) clean, typed, and predictable.
    - Follow Semantic Versioning (`SemVer`): document any intentional breaking changes clearly in `CHANGELOG.md`.
 
 5. **High Reliability & Test Rigor**
@@ -75,8 +75,8 @@ Agents modifying parsing, scheduling, or tariff logic must uphold these invarian
 
 - **Timezone & Local-Hour Semantics:** Prices are stored in `dict[datetime, float]` keyed by tz-aware UTC datetimes, but Spanish electricity prices apply by **local wall-clock hour** (e.g., 10:00 in Canary Islands applies the 10:00 price, shifted relative to `Europe/Madrid`). Always test both `Europe/Madrid` and `Atlantic/Canary`.
 - **Daylight Saving Time (DST):** Spring-forward (23-hour) and fall-back (25-hour, duplicated hour suffixed with `_d` in attributes) transitions must remain fully supported and tested.
-- **Tariff Zones:** Support both `2.0TD` (`PCB`, Peninsula/Balearics/Canaries) and `2.0TD (Ceuta/Melilla)` (`CYM`, shifted `P2` hours: 8–10, 15–18, 23).
-- **ESIOS Rate-Limit Respect:** `PVPCData._update_prices_series` intentionally avoids redundant API calls once today's (or today + tomorrow's after 20:00 `Europe/Madrid`) prices are cached. Do not introduce polling behavior that increases requests per day.
+- **Tariff Zones & Holidays:** Support both `2.0TD` (`PCB`, Peninsula/Balearics/Canaries) and `2.0TD (Ceuta/Melilla)` (`CYM`, shifted `P2` hours: 8–10, 15–18, 23), explicit optional `geo_zone` overrides from `GEOZONES`, and 24h `P3` on weekends + the 9 fixed-date non-substitutable national holidays per CNMC Circular 3/2020 Art. 7.3.
+- **ESIOS Rate-Limit Respect:** `PVPCData._update_prices_series` intentionally avoids redundant API calls once today's (or today + tomorrow's after 20:00 `Europe/Madrid`, checked by date for both hourly and 15-minute series) prices are cached. Do not introduce polling behavior that increases requests per day.
 - **Auth Error Contract:** When using `data_source="esios"` with an API token, HTTP `401` and `403` responses must raise `BadApiTokenAuthError` so Home Assistant can trigger its re-authentication flow.
 - **Units:** ESIOS API returns prices in `€/MWh`; `aiopvpc` converts and exposes all prices in `€/kWh` rounded to `PRICE_PRECISION` (5 decimal places).
 
@@ -86,12 +86,12 @@ Agents modifying parsing, scheduling, or tariff logic must uphold these invarian
 
 ### Code Quality & Tests
 - **Environment & Packaging:** Managed with `uv` (`uv sync --locked`, `uv run pytest`, `uv build`). Uses PEP 621 metadata with `hatchling` as the build backend.
-- **Linting & Formatting:** Configured via `ruff` in `pyproject.toml` (line length `88`, strict rule selection including `ASYNC`, `B`, `C4`, `I`, `PTH`, `RUF`, `SIM`, `TCH`). Run `uv run ruff check --no-fix` and `uv run ruff format --check` before committing.
+- **Linting & Formatting:** Configured via `ruff` in `pyproject.toml` (line length `88`, strict rule selection including `ASYNC`, `B`, `C4`, `I`, `PTH`, `RUF`, `SIM`, `TCH`). Run `uv run ruff check --no-fix .` and `uv run ruff format --check .` before committing.
 - **Offline Test Suite (Default):** `uv run pytest` automatically runs with coverage (`fail_under = 95`) and `-m 'not real_api_call'`. All PRs and commits must pass offline tests with >= 95% branch coverage.
 - **Live ESIOS API Tests:** `tests/test_real_api_calls.py` requires a personal ESIOS API token via environment variable / local `.env` and explicit `uv run pytest -m real_api_call`. **Never commit API tokens or `.env` files.**
 
 ### CI/CD & Packaging
-- `.github/workflows/main.yml` runs `uv sync --locked`, `mypy`, tests, coverage checks, and `uv build` across Python 3.11–3.14 on pushes to `master` and pull requests.
+- `.github/workflows/main.yml` runs `uv sync --locked`, `ruff`, `mypy`, tests, coverage checks, and `uv build` across Python 3.11–3.14 on pushes to `master` and pull requests.
 - `.github/workflows/publish.yml` publishes `aiopvpc-ng` to PyPI via `uv publish --trusted-publishing always` only on GitHub Release publication (`release: [published]`) or manual `workflow_dispatch` using OIDC Trusted Publishing (`environment: pypi`).
 - Distribution package name is `aiopvpc-ng`, while the Python import package remains `aiopvpc` (`[tool.hatch.build.targets.wheel] packages = ["aiopvpc"]`) for drop-in compatibility with Home Assistant.
 

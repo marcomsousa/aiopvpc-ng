@@ -13,25 +13,34 @@
 
 # aiopvpc-ng
 
-Next-generation async Python library to download Spanish electricity hourly prices (PVPC 2.0TD, surplus/injection, MAG, OMIE, market adjustment, and indexed tariffs) from Red Eléctrica de España's ESIOS API (`api.esios.ree.es`).
+Next-generation async Python library (`>=3.11`) to download Spanish electricity prices (PVPC 2.0TD, surplus/injection, MAG, OMIE, market adjustment, and indexed tariffs) from Red Eléctrica de España's ESIOS API (`api.esios.ree.es`).
 
 `aiopvpc-ng` is an actively maintained, drop-in successor to [`azogue/aiopvpc`](https://github.com/azogue/aiopvpc), keeping the `aiopvpc` import namespace for full compatibility with the [**`pvpc_hourly_pricing`** Home Assistant integration](https://www.home-assistant.io/integrations/pvpc_hourly_pricing/) and standalone Python tools.
 
 ## Install
 
-Install with `pip install aiopvpc-ng` (or clone the repository to run tests and develop locally).
+Requires **Python 3.11 or newer**.
+
+Install with `pip install aiopvpc-ng` (or `uv add aiopvpc-ng`).
+
+For local development and testing with [`uv`](https://docs.astral.sh/uv/):
+
+```bash
+uv sync --locked
+uv run pytest
+```
 
 ## Usage
 
 ```python
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 import aiohttp
 from aiopvpc import PVPCData
 
 async with aiohttp.ClientSession() as session:
     pvpc_handler = PVPCData(session=session, tariff="2.0TD")
     esios_data = await pvpc_handler.async_update_all(
-        current_data=None, now=datetime.now(timezone.utc)
+        current_data=None, now=datetime.now(UTC)
     )
 print(esios_data.sensors["PVPC"])
 ```
