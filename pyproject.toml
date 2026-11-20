@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aiopvpc-ng"
-version = "5.0.1"
+version = "5.1.0"
 description = "Next-generation async library to retrieve Spanish Electricity hourly prices (PVPC)"
 readme = "README.md"
 license = "MIT"
@@ -82,6 +82,7 @@ exclude_lines = [
 minversion = "6.0"
 testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error"]
 addopts = "-vv -s --cov --cov-report term --cov-report html -m 'not real_api_call'"
 log_level = "INFO"
 log_format = "%(asctime)s.%(msecs)03d %(levelname)s: (%(filename)s:%(lineno)s): %(message)s"
@@ -93,3 +94,13 @@ log_cli_date_format = "%H:%M:%S"
 markers = [
     "real_api_call: Tests making requests to api.esios.ree.es (deselected by default)",
 ]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = "aiopvpc.*"
+check_untyped_defs = true

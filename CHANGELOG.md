@@ -1,5 +1,26 @@
 # Changelog
 
+## [v5.1.0](https://github.com/marcomsousa/aiopvpc-ng/tree/v5.1.0) - 🛡️ ESIOS API improvements, HTTP safety, PEP 561 typing & bug fixes (2026-11-20)
+
+[Full Changelog](https://github.com/marcomsousa/aiopvpc-ng/compare/v5.0.1...v5.1.0)
+
+### Features & ESIOS API Improvements
+
+- ✨ Add PEP 561 `aiopvpc/py.typed` marker and expose `__version__` from `aiopvpc`
+- ⚡ Filter multi-geozone ESIOS `/indicators/{id}` requests server-side via `geo_ids[]` (`1001`, `1900`, `2108`), reducing payload size while keeping single-zone indicators (`1739`, `10211`) unaffected
+- ✨ Parse `TAHPCB`/`TAHCYM` (`KEY_ADJUSTMENT`) from 2024+ public `/archives/70` payloads in `extract_prices_from_esios_public`
+- ✨ Use ESIOS API v2 `Accept: application/json; application/vnd.esios-api-v2+json` header on token-authenticated requests
+- ✨ Add `minutes_to_better_price` attribute for quarter-hourly (15-minute) price series
+
+### Fixes & Hardening
+
+- 🐛 Use `async with self._session.get(...) as resp:` in `PVPCData._api_get_data` to prevent `aiohttp` response/connection leaks
+- 🔒 Stop including the secret ESIOS API token in `BadApiTokenAuthError` exception messages
+- 🐛 Fix `_is_tomorrow_price` edge case by comparing `ts.date() > ref.date()` instead of `isocalendar()` components
+- 🛡️ Handle HTTP `429 Too Many Requests` (logging `Retry-After`) and malformed JSON (`ValueError`/`JSONDecodeError`) gracefully
+- ♻️ Replace runtime `assert` argument checks in `PVPCData` and `make_sensor_unique_id` with explicit `ValueError`
+- 🧪 Enforce `filterwarnings = ["error"]` in `pytest` and stricter `mypy` type checking
+
 ## [v5.0.1](https://github.com/marcomsousa/aiopvpc-ng/tree/v5.0.1) - 📦 Initial PyPI publication (2026-11-20)
 
 [Full Changelog](https://github.com/marcomsousa/aiopvpc-ng/compare/v5.0.0...v5.0.1)
