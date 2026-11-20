@@ -90,6 +90,7 @@ class PVPCData:
         if tariff not in TARIFFS:
             raise ValueError(f"Unknown tariff '{tariff}'. Expected one of {TARIFFS}")
         self.tariff = tariff
+        self._explicit_geo_zone = geo_zone
         self._geo_zone = resolve_geo_zone(tariff, self._local_timezone, geo_zone)
 
         self._power = power
@@ -194,7 +195,7 @@ class PVPCData:
             {KEY_PVPC},
             local_ref_now,
             local_ref_now,
-            geo_zone=self._geo_zone,
+            geo_zone=self._explicit_geo_zone,
         )
         try:
             prices = await self._download_daily_data(KEY_PVPC, today[0])
@@ -245,7 +246,7 @@ class PVPCData:
             api_sensors,
             local_ref_now,
             next_day,
-            geo_zone=self._geo_zone,
+            geo_zone=self._explicit_geo_zone,
         )
         updated = False
         tasks = []

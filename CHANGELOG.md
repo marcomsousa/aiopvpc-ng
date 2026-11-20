@@ -1,5 +1,11 @@
 # Changelog
 
+## [v5.1.1](https://github.com/marcomsousa/aiopvpc-ng/tree/v5.1.1) - 🔗 Preserve default ESIOS indicator URL format for Home Assistant Core test mocks (2026-11-20)
+
+[Full Changelog](https://github.com/marcomsousa/aiopvpc-ng/compare/v5.1.0...v5.1.1)
+
+- 🐛 Append `geo_ids[]` query parameter on `/indicators/{id}` URLs only when `geo_zone` is explicitly specified, preserving 100% URL compatibility with Home Assistant Core's `pvpc_aioclient_mock` fixture
+
 ## [v5.1.0](https://github.com/marcomsousa/aiopvpc-ng/tree/v5.1.0) - 🛡️ ESIOS API improvements, HTTP safety, PEP 561 typing & bug fixes (2026-11-20)
 
 [Full Changelog](https://github.com/marcomsousa/aiopvpc-ng/compare/v5.0.1...v5.1.0)

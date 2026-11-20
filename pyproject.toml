@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aiopvpc-ng"
-version = "5.1.0"
+version = "5.1.1"
 description = "Next-generation async library to retrieve Spanish Electricity hourly prices (PVPC)"
 readme = "README.md"
 license = "MIT"
