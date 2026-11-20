@@ -43,13 +43,20 @@ markers = [
 ]
 
 [tool.poetry]
-name = "aiopvpc"
+name = "aiopvpc-ng"
 version = "4.3.1"
-description = "Retrieval of Spanish Electricity hourly prices (PVPC)"
+description = "Next-generation async library to retrieve Spanish Electricity hourly prices (PVPC)"
 authors = ["Eugenio Panadero <eugenio.panadero@gmail.com>"]
+maintainers = ["Marco Sousa <marcomsousa@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/azogue/aiopvpc"
+homepage = "https://github.com/marcomsousa/aiopvpc-ng"
+repository = "https://github.com/marcomsousa/aiopvpc-ng"
+packages = [{ include = "aiopvpc" }]
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/marcomsousa/aiopvpc-ng/issues"
+"Changelog" = "https://github.com/marcomsousa/aiopvpc-ng/blob/master/CHANGELOG.md"
 
 [tool.poetry.dependencies]
 python = ">=3.9"

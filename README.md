@@ -1,39 +1,41 @@
 [![PyPI Version][pypi-image]][pypi-url]
-[![pre-commit.ci Status][pre-commit-ci-image]][pre-commit-ci-url]
 [![Build Status][build-image]][build-url]
+[![License][license-image]][license-url]
 
 <!-- Badges -->
 
-[pypi-image]: https://img.shields.io/pypi/v/aiopvpc
-[pypi-url]: https://pypi.org/project/aiopvpc/
-[pre-commit-ci-image]: https://results.pre-commit.ci/badge/github/azogue/aiopvpc/master.svg
-[pre-commit-ci-url]: https://results.pre-commit.ci/latest/github/azogue/aiopvpc/master
-[build-image]: https://github.com/azogue/aiopvpc/actions/workflows/main.yml/badge.svg
-[build-url]: https://github.com/azogue/aiopvpc/actions/workflows/main.yml
+[pypi-image]: https://img.shields.io/pypi/v/aiopvpc-ng
+[pypi-url]: https://pypi.org/project/aiopvpc-ng/
+[build-image]: https://github.com/marcomsousa/aiopvpc-ng/actions/workflows/main.yml/badge.svg
+[build-url]: https://github.com/marcomsousa/aiopvpc-ng/actions/workflows/main.yml
+[license-image]: https://img.shields.io/github/license/marcomsousa/aiopvpc-ng
+[license-url]: https://github.com/marcomsousa/aiopvpc-ng/blob/master/LICENSE
 
-# aiopvpc
+# aiopvpc-ng
 
-Simple aio library to download Spanish electricity hourly prices.
+Next-generation async Python library to download Spanish electricity hourly prices (PVPC 2.0TD, surplus/injection, MAG, OMIE, market adjustment, and indexed tariffs) from Red Eléctrica de España's ESIOS API (`api.esios.ree.es`).
 
-Made to support the [**`pvpc_hourly_pricing`** HomeAssistant integration](https://www.home-assistant.io/integrations/pvpc_hourly_pricing/).
-
-<span class="badge-buymeacoffee"><a href="https://www.buymeacoffee.com/azogue" title="Donate to this project using Buy Me A Coffee"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg" alt="Buy Me A Coffee donate button" /></a></span>
+`aiopvpc-ng` is an actively maintained, drop-in successor to [`azogue/aiopvpc`](https://github.com/azogue/aiopvpc), keeping the `aiopvpc` import namespace for full compatibility with the [**`pvpc_hourly_pricing`** Home Assistant integration](https://www.home-assistant.io/integrations/pvpc_hourly_pricing/) and standalone Python tools.
 
 ## Install
 
-Install with `pip install aiopvpc` or clone it to run tests or anything else.
+Install with `pip install aiopvpc-ng` (or clone the repository to run tests and develop locally).
 
 ## Usage
 
 ```python
+from datetime import datetime, timezone
 import aiohttp
-from datetime import datetime
 from aiopvpc import PVPCData
 
 async with aiohttp.ClientSession() as session:
     pvpc_handler = PVPCData(session=session, tariff="2.0TD")
     esios_data = await pvpc_handler.async_update_all(
-        current_data=None, now=datetime.utcnow()
+        current_data=None, now=datetime.now(timezone.utc)
     )
 print(esios_data.sensors["PVPC"])
 ```
+
+## Attribution
+
+Originally created by Eugenio Panadero ([`azogue/aiopvpc`](https://github.com/azogue/aiopvpc)). Maintained as `aiopvpc-ng` under the MIT License.

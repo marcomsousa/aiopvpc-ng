@@ -1,47 +1,36 @@
-name: Publish package on pypi
+name: CI
 
 on:
   push:
     branches: [master]
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  publish-flow:
+  test:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
+      contents: read
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up python
-        uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: "3.11"
 
-      - name: Run Poetry image
-        uses: abatilo/actions-poetry@v2.0.0
-        with:
-          poetry-version: 1.7.1
+      - name: Install Poetry
+        run: pipx install --python "$(which python)" poetry==1.7.1
 
-      - name: Install library
+      - name: Validate pyproject.toml
+        run: poetry check
+
+      - name: Install dependencies
         run: poetry install --no-interaction
 
       - name: Run tests
-        run: poetry run pytest
+        run: poetry run pytest --cov-report xml:coverage.xml
 
-        # publish version only when pyproject.toml is changed in master
-      - name: Filter changes in pyproject
-        uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters: |
-            root:
-              - 'pyproject.toml'
-
-      - if: ${{ (github.ref == 'refs/heads/master') && (steps.changes.outputs.root == 'true')}}
-        name: Build
+      - name: Build package
         run: poetry build
-
-      - if: ${{ (github.ref == 'refs/heads/master') && (steps.changes.outputs.root == 'true')}}
-        name: Publish release distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
