@@ -62,7 +62,8 @@ aiopvpc-ng/
 ├── .github/workflows/
 │   ├── main.yml          # Push & PR CI test, coverage, and package build workflow
 │   └── publish.yml       # Release-triggered PyPI publish workflow
-├── pyproject.toml        # Ruff, pytest, coverage, and package configuration
+├── pyproject.toml        # PEP 621 package metadata, uv dependency groups, ruff, pytest, coverage
+├── uv.lock               # Reproducible uv lockfile
 └── CHANGELOG.md          # Release history
 ```
 
@@ -84,14 +85,15 @@ Agents modifying parsing, scheduling, or tariff logic must uphold these invarian
 ## 5. Development, Testing & Release Guidelines
 
 ### Code Quality & Tests
-- **Linting & Formatting:** Configured via `ruff` in `pyproject.toml` (line length `88`, strict rule selection including `ASYNC`, `B`, `C4`, `I`, `PTH`, `RUF`, `SIM`, `TCH`). Run `ruff check` and `ruff format --check` before committing.
-- **Offline Test Suite (Default):** `pytest` automatically runs with coverage (`fail_under = 95`) and `-m 'not real_api_call'`. All PRs and commits must pass offline tests with >= 95% branch coverage.
-- **Live ESIOS API Tests:** `tests/test_real_api_calls.py` requires a personal ESIOS API token via environment variable / local `.env` and explicit `-m real_api_call`. **Never commit API tokens or `.env` files.**
+- **Environment & Packaging:** Managed with `uv` (`uv sync --locked`, `uv run pytest`, `uv build`). Uses PEP 621 metadata with `hatchling` as the build backend.
+- **Linting & Formatting:** Configured via `ruff` in `pyproject.toml` (line length `88`, strict rule selection including `ASYNC`, `B`, `C4`, `I`, `PTH`, `RUF`, `SIM`, `TCH`). Run `uv run ruff check --no-fix` and `uv run ruff format --check` before committing.
+- **Offline Test Suite (Default):** `uv run pytest` automatically runs with coverage (`fail_under = 95`) and `-m 'not real_api_call'`. All PRs and commits must pass offline tests with >= 95% branch coverage.
+- **Live ESIOS API Tests:** `tests/test_real_api_calls.py` requires a personal ESIOS API token via environment variable / local `.env` and explicit `uv run pytest -m real_api_call`. **Never commit API tokens or `.env` files.**
 
 ### CI/CD & Packaging
-- `.github/workflows/main.yml` runs tests, coverage checks, and `poetry build` on pushes to `master` and pull requests.
-- `.github/workflows/publish.yml` publishes `aiopvpc-ng` to PyPI only on GitHub Release publication (`release: [published]`) or manual `workflow_dispatch` using OIDC Trusted Publishing (`environment: pypi`).
-- Distribution package name is `aiopvpc-ng`, while the Python import package remains `aiopvpc` (`packages = [{ include = "aiopvpc" }]`) for drop-in compatibility with Home Assistant.
+- `.github/workflows/main.yml` runs `uv sync --locked`, tests, coverage checks, and `uv build` across Python 3.11–3.13 on pushes to `master` and pull requests.
+- `.github/workflows/publish.yml` publishes `aiopvpc-ng` to PyPI via `uv publish --trusted-publishing always` only on GitHub Release publication (`release: [published]`) or manual `workflow_dispatch` using OIDC Trusted Publishing (`environment: pypi`).
+- Distribution package name is `aiopvpc-ng`, while the Python import package remains `aiopvpc` (`[tool.hatch.build.targets.wheel] packages = ["aiopvpc"]`) for drop-in compatibility with Home Assistant.
 
 ### Git & Contribution Conventions
 - Commit as `Marco Sousa <marcomsousa@gmail.com>` under GitHub account `marcomsousa`.
