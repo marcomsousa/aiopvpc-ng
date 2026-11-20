@@ -1,5 +1,11 @@
 # Changelog
 
+## [v5.0.1](https://github.com/marcomsousa/aiopvpc-ng/tree/v5.0.1) - 📦 Initial PyPI publication (2026-11-20)
+
+[Full Changelog](https://github.com/marcomsousa/aiopvpc-ng/compare/v5.0.0...v5.0.1)
+
+- 📦 Bump patch version to `5.0.1` for initial PyPI publication of the `v5.0.0` Next-Gen modernization release (`5.0.0` filename previously deleted on PyPI)
+
 ## [v5.0.0](https://github.com/marcomsousa/aiopvpc-ng/tree/v5.0.0) - 🚀 Next-Gen modernization & Python 3.11+ (2026-11-20)
 
 [Full Changelog](https://github.com/marcomsousa/aiopvpc-ng/compare/v4.3.1...v5.0.0)
