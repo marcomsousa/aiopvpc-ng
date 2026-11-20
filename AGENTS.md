@@ -91,7 +91,7 @@ Agents modifying parsing, scheduling, or tariff logic must uphold these invarian
 - **Live ESIOS API Tests:** `tests/test_real_api_calls.py` requires a personal ESIOS API token via environment variable / local `.env` and explicit `uv run pytest -m real_api_call`. **Never commit API tokens or `.env` files.**
 
 ### CI/CD & Packaging
-- `.github/workflows/main.yml` runs `uv sync --locked`, tests, coverage checks, and `uv build` across Python 3.11–3.13 on pushes to `master` and pull requests.
+- `.github/workflows/main.yml` runs `uv sync --locked`, `mypy`, tests, coverage checks, and `uv build` across Python 3.11–3.14 on pushes to `master` and pull requests.
 - `.github/workflows/publish.yml` publishes `aiopvpc-ng` to PyPI via `uv publish --trusted-publishing always` only on GitHub Release publication (`release: [published]`) or manual `workflow_dispatch` using OIDC Trusted Publishing (`environment: pypi`).
 - Distribution package name is `aiopvpc-ng`, while the Python import package remains `aiopvpc` (`[tool.hatch.build.targets.wheel] packages = ["aiopvpc"]`) for drop-in compatibility with Home Assistant.
 
