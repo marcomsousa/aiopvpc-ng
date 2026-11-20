@@ -13,9 +13,12 @@ from typing import Any
 from aiopvpc.const import (
     CANARY_TZ,
     DataSource,
+    ESIOS_MULTI_GEOZONE_INDICATORS,
     EsiosResponse,
     GEOZONE_ID2NAME,
+    GEOZONE_NAME2ID,
     GEOZONES,
+    KEY_ADJUSTMENT,
     KEY_PVPC,
     PRICE_PRECISION,
     REFERENCE_TZ,
@@ -70,13 +73,20 @@ def extract_prices_from_esios_public(
         ts_init + timedelta(hours=i): _parse_tariff_val(values_hour[key])
         for i, values_hour in enumerate(data["PVPC"])
     }
+    series: dict[str, dict[datetime, float]] = {KEY_PVPC: pvpc_prices}
+    tah_key = f"TAH{key}"
+    if tah_key in data["PVPC"][0]:
+        series[KEY_ADJUSTMENT] = {
+            ts_init + timedelta(hours=i): _parse_tariff_val(values_hour[tah_key])
+            for i, values_hour in enumerate(data["PVPC"])
+        }
 
     return EsiosResponse(
         name="PVPC ESIOS",
         data_id="legacy",
         last_update=datetime.now(UTC).replace(microsecond=0),
         unit="€/kWh",
-        series={KEY_PVPC: pvpc_prices},
+        series=series,
     )
 
 
@@ -151,6 +161,7 @@ def get_daily_urls_to_download(
     sensor_keys: set[str],
     now_local_ref: datetime,
     next_day_local_ref: datetime,
+    geo_zone: str | None = None,
 ) -> tuple[list[str], list[str]]:
     """Make URLs for ESIOS price series."""
     if source == "esios_public":
@@ -161,16 +172,15 @@ def get_daily_urls_to_download(
         )
 
     assert source == "esios"
-    today = [
-        URL_ESIOS_TOKEN_RESOURCE.format(
-            ind=SENSOR_KEY_TO_DATAID[key], day=now_local_ref.date()
-        )
-        for key in sensor_keys
-    ]
-    tomorrow = [
-        URL_ESIOS_TOKEN_RESOURCE.format(
-            ind=SENSOR_KEY_TO_DATAID[key], day=next_day_local_ref.date()
-        )
-        for key in sensor_keys
-    ]
+    geo_id = GEOZONE_NAME2ID.get(geo_zone) if geo_zone is not None else None
+
+    def _build_token_url(key: str, target_day: datetime) -> str:
+        ind = SENSOR_KEY_TO_DATAID[key]
+        base = URL_ESIOS_TOKEN_RESOURCE.format(ind=ind, day=target_day.date())
+        if geo_id is not None and ind in ESIOS_MULTI_GEOZONE_INDICATORS:
+            return base.replace("?", f"?geo_ids[]={geo_id}&", 1)
+        return base
+
+    today = [_build_token_url(key, now_local_ref) for key in sensor_keys]
+    tomorrow = [_build_token_url(key, next_day_local_ref) for key in sensor_keys]
     return today, tomorrow

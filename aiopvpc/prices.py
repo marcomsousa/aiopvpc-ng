@@ -16,10 +16,7 @@ from .const import (
 
 
 def _is_tomorrow_price(ts: datetime, ref: datetime) -> bool:
-    return any(
-        ts_comp > ts_tz_ref
-        for ts_comp, ts_tz_ref in zip(ts.isocalendar(), ref.isocalendar())
-    )
+    return ts.date() > ref.date()
 
 
 def _split_today_tomorrow_prices(
@@ -79,6 +76,10 @@ def _make_price_stats_attributes(
         delta_better = next_better_ts - utc_time
         attributes["next_better_price"] = next_better_price
         attributes["hours_to_better_price"] = int(delta_better.total_seconds()) // 3600
+        if any(ts.minute != 0 for ts in current_prices):
+            attributes["minutes_to_better_price"] = (
+                int(delta_better.total_seconds()) // 60
+            )
         attributes["num_better_prices_ahead"] = len(better_prices_ahead)
 
     with suppress(ValueError):

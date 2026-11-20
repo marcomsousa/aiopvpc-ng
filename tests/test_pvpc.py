@@ -26,6 +26,7 @@ from tests.conftest import check_num_datapoints, MockAsyncSession, run_h_step, T
     (
         ("esios_public", None, "2032-10-26", 0, 200, None),
         ("esios_public", None, "2032-10-26", 1, 500, None),
+        ("esios_public", None, "2032-10-26", 1, 429, None),
         ("esios", "bad-token", "2032-10-26", 1, 403, None),
         ("esios", "bad-token", "2032-10-26", 1, 401, None),
         ("esios_public", None, "2032-10-26", 1, 200, TimeoutError),
@@ -44,7 +45,8 @@ async def test_bad_downloads(
 ):
     """Test data parsing of official API files."""
     day = datetime.fromisoformat(day_str).astimezone(REFERENCE_TZ)
-    mock_session = MockAsyncSession(status=status, exc=exception)
+    headers = {"Retry-After": "60"} if status == 429 else None
+    mock_session = MockAsyncSession(status=status, exc=exception, headers=headers)
     with caplog.at_level(logging.INFO):
         pvpc_data = PVPCData(
             session=mock_session,
@@ -52,8 +54,9 @@ async def test_bad_downloads(
             api_token=api_token,
         )
         if status in (401, 403):
-            with pytest.raises(BadApiTokenAuthError):
+            with pytest.raises(BadApiTokenAuthError) as exc_info:
                 await pvpc_data.async_update_all(None, day)
+            assert api_token not in str(exc_info.value)
             assert mock_session.call_count == 1
             return
 
@@ -63,6 +66,29 @@ async def test_bad_downloads(
         assert len(caplog.messages) == num_log_msgs
     assert mock_session.call_count == 1
     check_num_datapoints(api_data, (KEY_PVPC,), 0)
+
+
+@pytest.mark.asyncio
+async def test_malformed_json_and_validation_errors():
+    """Verify JSON decode errors are handled and invalid args raise ValueError."""
+    import json
+
+    from aiopvpc import __version__
+
+    assert __version__
+    mock_session = MockAsyncSession(json_exc=json.JSONDecodeError("bad", "<html>", 0))
+    pvpc_data = PVPCData(session=mock_session)
+    api_data = await pvpc_data.async_update_all(
+        None, datetime(2024, 3, 9, 10, tzinfo=UTC_TZ)
+    )
+    assert not api_data.sensors[KEY_PVPC]
+
+    with pytest.raises(ValueError, match="API token is required"):
+        PVPCData(session=mock_session, data_source="esios", api_token=None)
+    with pytest.raises(ValueError, match="Unknown tariff"):
+        PVPCData(session=mock_session, tariff="9.9XX")
+    with pytest.raises(ValueError, match="Unknown sensor"):
+        pvpc_data.update_active_sensors("INVALID", enabled=True)
 
 
 # TODO review download schedule for Canary Islands TZ

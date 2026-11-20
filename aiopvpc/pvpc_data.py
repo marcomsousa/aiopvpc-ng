@@ -83,10 +83,12 @@ class PVPCData:
         self._api_token = api_token
         if self._api_token is not None:
             self._data_source = "esios"
-        assert (data_source != "esios") or self._api_token is not None, data_source
+        if data_source == "esios" and self._api_token is None:
+            raise ValueError("API token is required when data_source is 'esios'")
 
         self._local_timezone = zoneinfo.ZoneInfo(str(local_timezone))
-        assert tariff in TARIFFS
+        if tariff not in TARIFFS:
+            raise ValueError(f"Unknown tariff '{tariff}'. Expected one of {TARIFFS}")
         self.tariff = tariff
         self._geo_zone = resolve_geo_zone(tariff, self._local_timezone, geo_zone)
 
@@ -100,7 +102,11 @@ class PVPCData:
 
     async def _api_get_data(self, sensor_key: str, url: str) -> EsiosResponse | None:
         headers = {
-            "Accept": "application/json",
+            "Accept": (
+                "application/json; application/vnd.esios-api-v2+json"
+                if self.using_private_api
+                else "application/json"
+            ),
             "Content-Type": "application/json",
             "Host": "api.esios.ree.es",
         }
@@ -110,35 +116,45 @@ class PVPCData:
             headers["Authorization"] = f"Token token={self._api_token}"
 
         assert self._session is not None
-        resp = await self._session.get(url, headers=headers)
-        if resp.status < 400:
-            data = await resp.json()
-            return extract_esios_data(
-                data,
-                url,
+        async with self._session.get(url, headers=headers) as resp:
+            if resp.status < 400:
+                data = await resp.json()
+                return extract_esios_data(
+                    data,
+                    url,
+                    sensor_key,
+                    self.tariff,
+                    tz=self._local_timezone,
+                    geo_zone=self._geo_zone,
+                )
+            if resp.status in (401, 403) and self._data_source == "esios":
+                _LOGGER.warning(
+                    "[%s] Unauthorized error with '%s': %s",
+                    sensor_key,
+                    self._data_source,
+                    url,
+                )
+                raise BadApiTokenAuthError(
+                    f"[{sensor_key}] Unauthorized access with ESIOS API token"
+                )
+            if resp.status == 429:
+                retry_after = resp.headers.get("Retry-After")
+                _LOGGER.warning(
+                    "[%s] Rate limited [429] with '%s' (Retry-After: %s): %s",
+                    sensor_key,
+                    self._data_source,
+                    retry_after,
+                    url,
+                )
+                return None
+            _LOGGER.error(
+                "[%s] Unknown error [%d] with '%s': %s",
                 sensor_key,
-                self.tariff,
-                tz=self._local_timezone,
-                geo_zone=self._geo_zone,
-            )
-        if resp.status in (401, 403) and self._data_source == "esios":
-            _LOGGER.warning(
-                "[%s] Unauthorized error with '%s': %s",
-                sensor_key,
+                resp.status,
                 self._data_source,
                 url,
             )
-            raise BadApiTokenAuthError(
-                f"[{sensor_key}] Unauthorized access with API token '{self._api_token}'"
-            )
-        _LOGGER.error(
-            "[%s] Unknown error [%d] with '%s': %s",
-            sensor_key,
-            resp.status,
-            self._data_source,
-            url,
-        )
-        return None
+            return None
 
     async def _download_daily_data(
         self, sensor_key: str, url: str
@@ -153,7 +169,7 @@ class PVPCData:
         try:
             async with asyncio.timeout(self._timeout):
                 return await self._api_get_data(sensor_key, url)
-        except (AttributeError, KeyError, TypeError) as exc:
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
             _LOGGER.debug("[%s] Bad try on getting prices (%s)", sensor_key, exc)
         except TimeoutError:
             _LOGGER.warning(
@@ -178,6 +194,7 @@ class PVPCData:
             {KEY_PVPC},
             local_ref_now,
             local_ref_now,
+            geo_zone=self._geo_zone,
         )
         try:
             prices = await self._download_daily_data(KEY_PVPC, today[0])
@@ -185,9 +202,12 @@ class PVPCData:
             return False
         return prices is not None
 
-    def update_active_sensors(self, data_id: str, enabled: bool):
+    def update_active_sensors(self, data_id: str, enabled: bool) -> None:
         """Update enabled API indicators to download."""
-        assert data_id in ALL_SENSORS
+        if data_id not in ALL_SENSORS:
+            raise ValueError(
+                f"Unknown sensor '{data_id}'. Expected one of {ALL_SENSORS}"
+            )
         if enabled:
             self._sensor_keys.add(data_id)
         elif data_id in self._sensor_keys:
@@ -225,6 +245,7 @@ class PVPCData:
             api_sensors,
             local_ref_now,
             next_day,
+            geo_zone=self._geo_zone,
         )
         updated = False
         tasks = []

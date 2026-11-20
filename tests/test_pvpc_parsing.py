@@ -17,7 +17,12 @@ from aiopvpc.const import (
     REFERENCE_TZ,
     SENSOR_KEY_TO_DATAID,
 )
-from aiopvpc.parser import extract_prices_from_esios_token
+from aiopvpc.parser import (
+    extract_prices_from_esios_public,
+    extract_prices_from_esios_token,
+    get_daily_urls_to_download,
+)
+from aiopvpc.prices import _is_tomorrow_price
 from aiopvpc.pvpc_data import PVPCData
 from tests.conftest import MockAsyncSession, TZ_TEST
 
@@ -217,6 +222,14 @@ async def test_quarter_hourly_parsing_and_scheduling():
         assert pvpc_data.sensor_attributes[KEY_PVPC][key_name] == expected_price
         assert len(api_data.sensors[KEY_PVPC]) == 96
 
+    # Check minutes_to_better_price when a cheaper 15-min slot is ahead
+    api_data.sensors[KEY_PVPC][
+        datetime(2026, 1, 15, 10, 15, tzinfo=REFERENCE_TZ).astimezone()
+    ] = 0.05
+    ts_10_00 = datetime(2026, 1, 15, 10, 0, tzinfo=REFERENCE_TZ)
+    assert pvpc_data.process_state_and_attributes(api_data, KEY_PVPC, ts_10_00)
+    assert pvpc_data.sensor_attributes[KEY_PVPC]["minutes_to_better_price"] == 15
+
     # At 20:00 with 96 today slots, must still fetch tomorrow's prices
     evening_20 = datetime(2026, 1, 15, 20, 0, tzinfo=REFERENCE_TZ)
     api_data = await pvpc_data.async_update_all(api_data, evening_20)
@@ -227,3 +240,47 @@ async def test_quarter_hourly_parsing_and_scheduling():
     evening_21 = datetime(2026, 1, 15, 21, 0, tzinfo=REFERENCE_TZ)
     api_data = await pvpc_data.async_update_all(api_data, evening_21)
     assert mock_session.call_count == 2
+
+
+def test_is_tomorrow_price_and_public_tah_and_geo_urls():
+    """Verify _is_tomorrow_price edge cases, public TAH parsing, and geo_ids[] URLs."""
+    # Past date in previous week with higher weekday must NOT be tomorrow
+    ref_mon = datetime(2026, 11, 16, 10, tzinfo=REFERENCE_TZ)
+    past_tue = datetime(2026, 11, 10, 10, tzinfo=REFERENCE_TZ)
+    next_tue = datetime(2026, 11, 17, 0, tzinfo=REFERENCE_TZ)
+    assert not _is_tomorrow_price(past_tue, ref_mon)
+    assert not _is_tomorrow_price(ref_mon, ref_mon)
+    assert _is_tomorrow_price(next_tue, ref_mon)
+    # Year rollover
+    assert _is_tomorrow_price(
+        datetime(2027, 1, 1, 0, tzinfo=REFERENCE_TZ),
+        datetime(2026, 12, 31, 23, tzinfo=REFERENCE_TZ),
+    )
+
+    # Public archive with 2026 TAHPCB field parses both PVPC and ADJUSTMENT
+    public_payload = {
+        "PVPC": [
+            {"Dia": "20/11/2026", "Hora": "00-01", "PCB": "78,63", "TAHPCB": "-36,42"},
+            {"Dia": "20/11/2026", "Hora": "01-02", "PCB": "70,00", "TAHPCB": "-30,00"},
+        ]
+    }
+    parsed = extract_prices_from_esios_public(public_payload, "PCB", REFERENCE_TZ)
+    assert KEY_PVPC in parsed.series
+    assert KEY_ADJUSTMENT in parsed.series
+    assert list(parsed.series[KEY_ADJUSTMENT].values()) == [-0.03642, -0.03]
+
+    # Server-side geo_ids[] filtering applies only to multi-geozone indicators
+    now_ref = datetime(2026, 11, 20, 10, tzinfo=REFERENCE_TZ)
+    next_ref = now_ref + timedelta(days=1)
+    today_urls, _ = get_daily_urls_to_download(
+        "esios",
+        {KEY_PVPC, KEY_INJECTION, KEY_OMIE, KEY_ADJUSTMENT},
+        now_ref,
+        next_ref,
+        geo_zone="Canarias",
+    )
+    by_ind = {u.split("/indicators/")[1].split("?")[0]: u for u in today_urls}
+    assert "geo_ids[]=8742&" in by_ind["1001"]
+    assert "geo_ids[]=8742&" in by_ind["2108"]
+    assert "geo_ids[]" not in by_ind["1739"]
+    assert "geo_ids[]" not in by_ind["10211"]
