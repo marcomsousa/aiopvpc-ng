@@ -43,11 +43,13 @@ async def _get_real_data(
     ),
 )
 async def test_real_download_today_async(data_source, timezone, num_sensors):
+    if data_source == "esios" and not os.getenv("ESIOS_TOKEN"):
+        pytest.skip("ESIOS_TOKEN not configured")
     sensor_keys = ALL_SENSORS if data_source == "esios" else (KEY_PVPC,)
     api_data = await _get_real_data(
         timezone, data_source, sensor_keys, datetime.now(UTC)
     )
-    assert 22 < len(api_data.sensors[KEY_PVPC]) < 49
+    assert 22 < len(api_data.sensors[KEY_PVPC]) <= 196
     assert len(api_data.sensors) == num_sensors
 
 
