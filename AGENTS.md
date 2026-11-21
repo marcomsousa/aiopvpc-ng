@@ -21,7 +21,7 @@ When planning features, refactors, or fixes in this repository, uphold and advan
 
 2. **Modern Python Runtime, Tooling & CI**
    - Uses Python `>=3.11` stdlib APIs (`datetime.now(UTC)`, `asyncio.timeout`, built-in `TimeoutError`) without external `async_timeout`.
-   - Managed with `uv`, `hatchling` (PEP 621 / PEP 639 / PEP 735), modern `.pre-commit-config.yaml`, and GitHub Actions running `ruff`, `mypy`, `pytest`, and `uv build` across Python 3.11–3.14.
+   - Managed with `uv`, `hatchling` (PEP 621 / PEP 639 / PEP 735), modern `.pre-commit-config.yaml`, and GitHub Actions running `ruff`, `mypy`, `pytest`, and `uv build` across Python 3.11–3.15.
 
 3. **Keep Up With ESIOS API & Spanish Electricity Market Changes**
    - Maintain compatibility with `api.esios.ree.es` public archives and token-authenticated `/indicators/{id}` endpoints.
@@ -91,7 +91,7 @@ Agents modifying parsing, scheduling, or tariff logic must uphold these invarian
 - **Live ESIOS API Tests:** `tests/test_real_api_calls.py` requires a personal ESIOS API token via environment variable / local `.env` and explicit `uv run pytest -m real_api_call`. **Never commit API tokens or `.env` files.**
 
 ### CI/CD & Packaging
-- `.github/workflows/main.yml` runs `uv sync --locked`, `ruff`, `mypy`, tests, coverage checks, and `uv build` across Python 3.11–3.14 on pushes to `master` and pull requests.
+- `.github/workflows/main.yml` runs `uv sync --locked`, `ruff`, `mypy`, tests, coverage checks, and `uv build` across Python 3.11–3.15 on pushes to `master` and pull requests.
 - `.github/workflows/publish.yml` publishes `aiopvpc-ng` to PyPI via `pypa/gh-action-pypi-publish@release/v1` (with PEP 740 provenance attestations) only on GitHub Release publication (`release: [published]`) or manual `workflow_dispatch` using OIDC Trusted Publishing (`environment: pypi`).
 - Distribution package name is `aiopvpc-ng`, while the Python import package remains `aiopvpc` (`[tool.hatch.build.targets.wheel] packages = ["aiopvpc"]`) for drop-in compatibility with Home Assistant.
 
