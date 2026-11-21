@@ -1,4 +1,5 @@
 [![PyPI Version][pypi-image]][pypi-url]
+[![Downloads](https://static.pepy.tech/badge/aiopvpc-ng)](https://pepy.tech/projects/aiopvpc-ng)
 [![Build Status][build-image]][build-url]
 [![License][license-image]][license-url]
 
